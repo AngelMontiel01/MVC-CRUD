@@ -1,0 +1,292 @@
+﻿@{
+    ViewData["Title"] = "Products";
+}
+
+<link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<h1>Product List</h1>
+<input type="text" id="search" placeholder="Search by product name" class="form-control mb-3" />
+<button class="btn btn-primary mb-3" onclick="openCreateModal()">Add New Product</button>
+
+<div class="row" id="product-list">
+    <!-- Los productos se cargarán aquí como tarjetas -->
+</div>
+
+<!-- Modal para agregar producto -->
+<div class="modal fade" id="createProductModal" tabindex="-1" role="dialog" aria-labelledby="createProductModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="createProductModalLabel">Add New Product</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="createProductForm">
+                    <div class="form-group">
+                        <label for="productTitle">Title</label>
+                        <input type="text" id="productTitle" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="productDescription">Description</label>
+                        <textarea id="productDescription" class="form-control" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="productPrice">Price</label>
+                        <input type="number" id="productPrice" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="productCategory">Category</label>
+                        <input type="text" id="productCategory" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="productImage">Image URL</label>
+                        <input type="text" id="productImage" class="form-control" required>
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="submitProductForm()">Add Product</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<!-- Modal para editar producto -->
+<div class="modal fade" id="editProductModal" tabindex="-1" role="dialog" aria-labelledby="editProductModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editProductModalLabel">Edit Product</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="editProductForm">
+                    <input type="hidden" id="editProductId">  <!-- Hidden field to store product ID -->
+                    <div class="form-group">
+                        <label for="editProductTitle">Title</label>
+                        <input type="text" id="editProductTitle" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editProductDescription">Description</label>
+                        <textarea id="editProductDescription" class="form-control" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="editProductPrice">Price</label>
+                        <input type="number" id="editProductPrice" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editProductCategory">Category</label>
+                        <input type="text" id="editProductCategory" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="editProductImage">Image URL</label>
+                        <input type="text" id="editProductImage" class="form-control" required>
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="submitEditProductForm()">Update Product</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    // Función para cargar los productos desde la API
+    async function loadProducts() {
+        const response = await fetch('/api/Products');  // Obtiene los productos desde el servidor
+        const products = await response.json();  // Convierte la respuesta a JSON
+
+        const productList = document.getElementById('product-list');  // Obtiene el contenedor de productos
+        productList.innerHTML = '';  // Limpia el contenedor de productos
+
+        // Itera sobre cada producto para crear una tarjeta de producto
+        products.forEach(product => {
+            // Verifica si el producto tiene imágenes, si no, usa una imagen por defecto
+            const imageUrl = (product.images && product.images.length > 0) ? product.images[0] : 'default-image-url.jpg';
+
+            const card = `  <!-- Genera una tarjeta para cada producto -->
+                        <div class="col-md-4 mb-4">
+                            <div class="card">
+                                <img src="${imageUrl}" class="card-img-top" alt="Imagen del producto" style="height: 200px; object-fit: cover;">
+                                <div class="card-body">
+                                    <h5 class="card-title">${product.title}</h5>
+                                    <p class="card-text">${product.description}</p>
+                                    <p class="card-text"><strong>Precio:</strong> $${product.price}</p>
+                                    <p class="card-text"><strong>Categoría:</strong> ${product.category.name}</p>
+                                    <button class="btn btn-info" onclick="editProduct(${product.id})">Editar</button>
+                                    <button class="btn btn-danger" onclick="deleteProduct(${product.id}, '${product.title}')">Eliminar</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+            productList.innerHTML += card;  // Añade la tarjeta generada al contenedor
+        });
+    }
+
+    // Filtro de productos por nombre
+    document.getElementById('search').addEventListener('input', function () {
+        const searchTerm = this.value.toLowerCase();  // Obtiene el término de búsqueda
+        document.querySelectorAll('#product-list .card').forEach(card => {
+            const title = card.querySelector('.card-title').textContent.toLowerCase();  // Obtiene el título del producto
+            // Muestra u oculta la tarjeta según si el título contiene el término de búsqueda
+            card.style.display = title.includes(searchTerm) ? '' : 'none';
+        });
+    });
+
+    // Abre el modal para crear un nuevo producto
+    function openCreateModal() {
+        $('#createProductModal').modal('show');  // Muestra el modal de creación de producto
+    }
+
+    // Función para enviar el formulario de creación de producto
+    async function submitProductForm() {
+        const title = document.getElementById('productTitle').value;  // Obtiene el título del formulario
+        const description = document.getElementById('productDescription').value;  // Obtiene la descripción
+        const price = parseFloat(document.getElementById('productPrice').value);  // Obtiene el precio
+        const category = {
+            name: document.getElementById('productCategory').value,  // Obtiene la categoría
+            image: document.getElementById('productImage').value  // Obtiene la imagen
+        };
+
+        const imageUrl = document.getElementById('productImage').value;  // Obtiene la URL de la imagen
+
+        const product = {  // Crea el objeto producto con los datos del formulario
+            title: title,
+            description: description,
+            price: price,
+            category: category,
+            images: [imageUrl]
+        };
+
+        await createProduct(product);  // Llama a la función para crear el producto
+
+        $('#createProductModal').modal('hide');  // Cierra el modal
+        document.getElementById('createProductForm').reset();  // Resetea el formulario
+
+        Swal.fire({  // Muestra un mensaje de éxito
+            title: '¡Producto Agregado!',
+            text: `${title} se ha agregado correctamente!`,  // Muestra el nombre del producto
+            icon: 'success',
+            confirmButtonText: 'OK'
+        });
+    }
+
+    // Función para crear un nuevo producto
+    async function createProduct(product) {
+        const response = await fetch('/api/Products', {  // Envía los datos del nuevo producto al servidor
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(product)
+        });
+
+        if (response.ok) {
+            loadProducts();  // Recarga los productos si la creación es exitosa
+        } else {
+            alert("Failed to create product.");  // Muestra un error si falla la creación
+        }
+    }
+
+    // Función para editar un producto
+    async function editProduct(id) {
+        try {
+            const response = await fetch(`/api/Products/${id}`);  // Obtiene los detalles del producto
+            if (!response.ok) {
+                throw new Error("Failed to fetch product");
+            }
+
+            const product = await response.json();  // Convierte la respuesta a JSON
+            document.getElementById('editProductId').value = product.id;  // Asigna el ID al campo oculto
+            document.getElementById('editProductTitle').value = product.title;  // Asigna el título al campo
+            document.getElementById('editProductDescription').value = product.description;  // Asigna la descripción
+            document.getElementById('editProductPrice').value = product.price;  // Asigna el precio
+            document.getElementById('editProductCategory').value = product.category.name;  // Asigna la categoría
+            document.getElementById('editProductImage').value = product.images[0] || '';  // Asigna la imagen
+
+            $('#editProductModal').modal('show');  // Muestra el modal de edición
+        } catch (error) {
+            console.error("Error fetching product:", error);
+            alert("Could not load product details.");  // Muestra un error si no se puede cargar el producto
+        }
+    }
+
+    // Función para enviar el formulario de edición de producto
+    async function submitEditProductForm() {
+        const id = document.getElementById('editProductId').value;  // Obtiene el ID del producto
+        const title = document.getElementById('editProductTitle').value;  // Obtiene el título
+        const description = document.getElementById('editProductDescription').value;  // Obtiene la descripción
+        const price = parseFloat(document.getElementById('editProductPrice').value);  // Obtiene el precio
+        const category = {
+            name: document.getElementById('editProductCategory').value,  // Obtiene la categoría
+            image: document.getElementById('editProductImage').value  // Obtiene la imagen
+        };
+        const imageUrl = [document.getElementById('editProductImage').value];  // Asegúrate de que sea un array
+
+        const product = {  // Crea el objeto producto con los datos del formulario
+            title: title,
+            description: description,
+            price: price,
+            category: category,
+            images: imageUrl
+        };
+
+        try {
+            const response = await fetch(`/api/Products/${id}`, {  // Envía los datos del producto editado
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(product)
+            });
+
+            if (response.ok) {
+                $('#editProductModal').modal('hide');  // Cierra el modal si la edición es exitosa
+                loadProducts();  // Recarga los productos
+                Swal.fire({  // Muestra un mensaje de éxito
+                    title: '¡Producto Actualizado!',
+                    text: `${title} se ha actualizado correctamente!`,  // Muestra el nombre del producto
+                    icon: 'success',
+                    confirmButtonText: 'OK'
+                });
+            } else {
+                throw new Error("No se pudo actualizar el producto");
+            }
+        } catch (error) {
+            console.error("Error al actualizar el producto:", error);
+            alert("No se pudo actualizar el producto.");  // Muestra un error si la edición falla
+        }
+    }
+
+    // Función para eliminar un producto
+    async function deleteProduct(id, productName) {
+        const result = await Swal.fire({  // Muestra un mensaje de confirmación antes de eliminar
+            title: 'Estas Seguro?',
+            text: `De verdad quieres eliminar: ${productName}?`,
+            icon: 'Peligro',
+            showCancelButton: true,
+            confirmButtonText: 'Si, Eliminar!',
+            cancelButtonText: 'Cancelar',
+        });
+
+        if (result.isConfirmed) {  // Si el usuario confirma la eliminación
+            const response = await fetch(`/api/Products/${id}`, { method: 'DELETE' });  // Envía la solicitud de eliminación
+
+            if (response.ok) {
+                loadProducts();  // Recarga los productos si la eliminación es exitosa
+                Swal.fire({  // Muestra un mensaje de éxito
+                    title: 'Producto Eliminado!',
+                    text: `${productName} Ha sido eliminado con exito!`,  // Muestra el nombre del producto eliminado
+                    icon: 'success',
+                    confirmButtonText: 'OK'
+                });
+            } else {
+                Swal.fire({  // Muestra un mensaje de error si la eliminación falla
+                    title: 'Error!',
+                    text: 'Fallo en eliminar producto.',
+                    icon: 'error',
+                    confirmButtonText: 'OK'
+                });
+            }
+        }
+    }
+
+    loadProducts();  // Llama a la función para cargar los productos cuando se carga la página
+</script>
+
